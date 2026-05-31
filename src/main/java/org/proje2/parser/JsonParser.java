@@ -65,18 +65,23 @@ public class JsonParser {
                 String columnName = prefix.isEmpty() ? key : prefix + "_" + key;
 
                 if (value.isObject()) {
-                    // 3NF: Nested objects are split into new tables to avoid transitive dependencies
-                    Table subTable = findOrCreateTable(key);
-                    Map<String, Object> subRow = new HashMap<>();
-                    int subId = getNextId(key);
+                    if (isSimpleObject(value)) {
+                        // Flattening: Simple nested objects are flattened into the parent table with a combined prefix
+                        parseNode(value, currentTable, currentRow, columnName, parentId);
+                    } else {
+                        // 3NF: Complex nested objects (depth >= 2) are split into new tables to avoid transitive dependencies
+                        Table subTable = findOrCreateTable(key);
+                        Map<String, Object> subRow = new HashMap<>();
+                        int subId = getNextId(key);
 
-                    subTable.addColumn("row_id", "INTEGER");
-                    subTable.addColumn("parent_row_id", "INTEGER");
-                    subRow.put("row_id", subId);
-                    subRow.put("parent_row_id", parentId);
-                    subTable.getRows().add(subRow);
+                        subTable.addColumn("row_id", "INTEGER");
+                        subTable.addColumn("parent_row_id", "INTEGER");
+                        subRow.put("row_id", subId);
+                        subRow.put("parent_row_id", parentId);
+                        subTable.getRows().add(subRow);
 
-                    parseNode(value, subTable, subRow, "", subId);
+                        parseNode(value, subTable, subRow, "", subId);
+                    }
                 } else if (value.isArray()) {
                     // 1NF: Arrays are split into separate child tables for atomic values
                     Table subTable = findOrCreateTable(key);
@@ -126,5 +131,21 @@ public class JsonParser {
         if (node.isFloatingPointNumber()) return "REAL";
         if (node.isBoolean()) return "BOOLEAN";
         return "TEXT";
+    }
+
+    /**
+     * Heuristic to determine if an object is simple (only primitives) for flattening,
+     * or complex (contains objects/arrays) for 3NF table splitting.
+     */
+    private boolean isSimpleObject(JsonNode node) {
+        if (!node.isObject()) return false;
+        Iterator<JsonNode> elements = node.elements();
+        while (elements.hasNext()) {
+            JsonNode child = elements.next();
+            if (child.isObject() || child.isArray()) {
+                return false; // Contains complex types, not simple
+            }
+        }
+        return true;
     }
 }

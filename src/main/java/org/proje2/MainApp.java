@@ -55,19 +55,33 @@ public class MainApp extends Application {
         rightPanel.setPadding(new Insets(10));
         tablesListView.setPrefWidth(150);
 
-        // --- CENTER PANEL (Data Grid) ---
-        VBox centerPanel = new VBox(5, new Label("Table Data Content"), dbTableView);
-        centerPanel.setPadding(new Insets(10));
+        // --- CENTER PANEL (Data Grid & SQL Query) ---
+        VBox centerTopPanel = new VBox(5, new Label("Table Data Content / Query Results"), dbTableView);
+        centerTopPanel.setPadding(new Insets(10));
+        VBox.setVgrow(dbTableView, javafx.scene.layout.Priority.ALWAYS);
+
+        TextArea sqlInputArea = new TextArea();
+        sqlInputArea.setPromptText("Enter your SQL query here (e.g. SELECT * FROM main_table)");
+        sqlInputArea.setPrefRowCount(4);
+        Button btnExecuteSql = new Button("Execute SQL");
+        HBox sqlControls = new HBox(10, btnExecuteSql);
+        VBox sqlPanel = new VBox(5, new Label("Custom SQL Query"), sqlInputArea, sqlControls);
+        sqlPanel.setPadding(new Insets(10));
+        
+        SplitPane centerSplit = new SplitPane(centerTopPanel, sqlPanel);
+        centerSplit.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        centerSplit.setDividerPositions(0.7);
 
         BorderPane root = new BorderPane();
         root.setTop(topPanel);
         root.setLeft(leftPanel);
-        root.setCenter(centerPanel);
+        root.setCenter(centerSplit);
         root.setRight(rightPanel);
 
         // --- EVENTS ---
         btnLoad.setOnAction(e -> loadJsonFile(primaryStage));
         btnReset.setOnAction(e -> resetDatabase());
+        btnExecuteSql.setOnAction(e -> executeCustomQuery(sqlInputArea.getText()));
         tablesListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) showTableData(newVal);
         });
@@ -185,6 +199,49 @@ public class MainApp extends Application {
 
         } catch (SQLException ex) {
             showAlert("Error", "Data reading error: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Executes a custom SQL query from the text area.
+     */
+    private void executeCustomQuery(String query) {
+        if (query == null || query.trim().isEmpty()) return;
+        
+        dbTableView.getColumns().clear();
+        dbTableView.getItems().clear();
+
+        try (Connection conn = dbManager.connect();
+             Statement stmt = conn.createStatement()) {
+             
+            boolean isResultSet = stmt.execute(query);
+            if (isResultSet) {
+                try (ResultSet rs = stmt.getResultSet()) {
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    for (int i = 1; i <= columnCount; i++) {
+                        final int j = i - 1;
+                        TableColumn<ObservableList<Object>, Object> col = new TableColumn<>(metaData.getColumnName(i));
+                        col.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue().get(j)));
+                        dbTableView.getColumns().add(col);
+                    }
+
+                    while (rs.next()) {
+                        ObservableList<Object> row = FXCollections.observableArrayList();
+                        for (int i = 1; i <= columnCount; i++) {
+                            row.add(rs.getObject(i));
+                        }
+                        dbTableView.getItems().add(row);
+                    }
+                }
+            } else {
+                int updateCount = stmt.getUpdateCount();
+                showAlert("Success", "Query executed successfully. Rows affected: " + updateCount);
+            }
+
+        } catch (SQLException ex) {
+            showAlert("Error", "SQL Execution error: " + ex.getMessage());
         }
     }
 

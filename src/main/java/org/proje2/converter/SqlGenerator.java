@@ -70,7 +70,13 @@ public class SqlGenerator {
                 .append(" (");
 
         List<String> columns = table.getColumns().entrySet().stream()
-                .map(e -> e.getKey() + " " + e.getValue())
+                .map(e -> {
+                    String colDef = e.getKey() + " " + e.getValue();
+                    if (e.getKey().equals("row_id")) {
+                        colDef += " PRIMARY KEY";
+                    }
+                    return colDef;
+                })
                 .collect(Collectors.toList());
 
         sql.append(String.join(", ", columns));
