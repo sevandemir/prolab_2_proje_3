@@ -5,24 +5,29 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /**
- * Manages the SQLite database connection.
+ * SQLite veritabanı bağlantısını yöneten sınıf.
+ * Veritabanı bağlantısının oluşturulması ve yapılandırılmasından sorumludur.
  */
 public class DatabaseManager {
-    // Database file will be created in the project root
+    // Veritabanı dosyası proje kök dizininde 'database.db' adıyla oluşturulacaktır
     private static final String URL = "jdbc:sqlite:database.db";
 
     /**
-     * Establishes a connection to the SQLite database.
-     * @return Connection object if successful, null otherwise.
+     * SQLite veritabanına bağlantı kurar.
+     * Bağlantı başarılı olursa Connection nesnesini, başarısız olursa null döndürür.
+     * 
+     * @return Başarılı bağlantı durumunda Connection nesnesi, aksi halde null.
      */
     public Connection connect() {
         Connection conn = null;
         try {
+            // Verilen URL ile veritabanına bağlanmayı dene
             conn = DriverManager.getConnection(URL);
-            System.out.println("SQLite connection successful");
+            System.out.println("SQLite bağlantısı başarılı");
         } catch (SQLException e) {
-            System.out.println("Connection error: " + e.getMessage());
+            // Bağlantı sırasında hata oluşursa hatayı ekrana yazdır
+            System.out.println("Bağlantı hatası: " + e.getMessage());
         }
-        return conn;
+        return conn; // Bağlantı nesnesini döndür
     }
 }
